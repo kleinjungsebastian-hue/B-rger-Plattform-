@@ -17,6 +17,27 @@ const TicketDetail = () => {
 
   useEffect(() => {
     fetchTicketAndChat();
+
+    // Live-Chat Verbindung (Realtime Subscription) aufbauen
+    const channel = supabase
+      .channel(`ticket_chat_${id}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'ticket_messages', 
+        filter: `ticket_id=eq.${id}` 
+      }, (payload) => {
+        setMessages(currentMessages => {
+          // Vermeide doppelte Einträge, falls wir die Nachricht selbst gesendet haben
+          if (currentMessages.some(m => m.id === payload.new.id)) return currentMessages;
+          return [...currentMessages, payload.new];
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const fetchTicketAndChat = async () => {
